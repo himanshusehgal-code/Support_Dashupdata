@@ -9,70 +9,39 @@ async def generate_dashboard_pdf(url: str):
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu"
+                "--disable-dev-shm-usage"
             ]
         )
         
-        context = await browser.new_context(
-            viewport={'width': 1280, 'height': 800}
-        )
+        context = await browser.new_context()
         page = await context.new_page()
 
         try:
             print("Opening URL:", url)
 
-            # ✅ Better loading strategy
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            await page.goto(url, timeout=60000)
 
-            # ✅ IMPORTANT: wait for dashboard content
-            await page.wait_for_selector("#mainContainer", timeout=30000)
+            # ✅ wait body instead of custom id (safe)
+            await page.wait_for_selector("body", timeout=30000)
 
-            # Extra buffer for charts
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
 
-            # ✅ Clean UI before PDF
-            await page.evaluate("""() => {
-                const hideIds = ['mobileAside', 'mobileTabs', 'dropZone', 'actionPanelWrapper'];
-                hideIds.forEach(id => { 
-                    const el = document.getElementById(id); 
-                    if(el) el.style.display = 'none'; 
-                });
+            # debug screenshot
+            await page.screenshot(path="debug.png")
 
-                const header = document.querySelector('header'); 
-                if(header) header.style.display = 'none';
-
-                const main = document.getElementById('mainContainer'); 
-                if(main) main.style.overflow = 'visible';
-            }""")
-
-            # ✅ Generate PDF
             pdf_bytes = await page.pdf(
                 format="A4",
-                landscape=True,
-                print_background=True,
-                margin={
-                    "top": "10mm",
-                    "bottom": "10mm",
-                    "left": "10mm",
-                    "right": "10mm"
-                }
+                print_background=True
             )
 
             await browser.close()
 
             return Response(
                 content=pdf_bytes,
-                media_type="application/pdf",
-                headers={
-                    "Content-Disposition": "attachment; filename=dashboard.pdf"
-                }
+                media_type="application/pdf"
             )
 
         except Exception as e:
             await browser.close()
             print("PDF ERROR:", str(e))
-            return Response(
-                content=f"Error: {str(e)}",
-                status_code=500
-            )
+            return Response(content=str(e), status_code=500)
