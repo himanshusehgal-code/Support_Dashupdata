@@ -3,31 +3,34 @@ from fastapi import Response
 
 async def generate_dashboard_pdf(url: str):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        # 🔥 RAM Saving Arguments add kiye hain
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox", 
+                "--disable-setuid-sandbox", 
+                "--disable-dev-shm-usage", 
+                "--disable-accelerated-2d-canvas", 
+                "--no-first-run", 
+                "--no-zygote", 
+                "--single-process" # Memory bachane ke liye single process
+            ]
+        )
         
-        await page.goto(url, wait_until="networkidle")
-        await page.wait_for_timeout(2000) # Charts render hone ka wait
+        context = await browser.new_context(viewport={'width': 1280, 'height': 800})
+        page = await context.new_page()
         
-        # Dashboard ko clean karo (Faltu UI hide karo)
-        await page.evaluate("""
-            () => {
-                const hideElements = ['mobileAside', 'mobileTabs', 'dropZone', 'actionPanelWrapper'];
-                hideElements.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.style.display = 'none';
-                });
-                const header = document.querySelector('header');
-                if (header) header.style.display = 'none';
-                const main = document.getElementById('mainContainer');
-                if (main) {
-                    main.style.height = 'auto';
-                    main.style.overflow = 'visible';
-                }
-            }
-        """)
+        # Timeout badha diya hai taaki Render slow hone par fail na ho
+        await page.goto(url, wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(3000) # Charts render hone ka buffer
         
-        # Landscape PDF nikalo
+        # Cleanup UI
+        await page.evaluate("""() => {
+            const ids = ['mobileAside', 'mobileTabs', 'dropZone', 'actionPanelWrapper'];
+            ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+            const header = document.querySelector('header'); if(header) header.style.display = 'none';
+        }""")
+        
         pdf_bytes = await page.pdf(
             format="A4",
             landscape=True, 
