@@ -6,7 +6,7 @@ from pivot_service import create_pivot_csv
 
 app = FastAPI()
 
-# CORS SETUP
+# CORS SETUP: GitHub Pages se connection allow karne ke liye
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request Models
+# Frontend se aane wale data ka structure
 class PivotRequest(BaseModel):
     csv_data: str
 
@@ -28,7 +28,7 @@ def read_root():
 
 @app.post("/export-dashboard-pdf")
 async def export_pdf(request: PDFRequest):
-    # Pass the URL from the JSON body
+    # JSON Body se URL nikaal kar function ko bhej rahe hain
     return await generate_dashboard_pdf(request.url)
 
 @app.post("/generate-pivot")
